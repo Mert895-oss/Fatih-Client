@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,22 +20,39 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Extract ZIP
+        run: |
+          mkdir extracted
+          ZIP=$(find . -maxdepth 2 -type f -iname "*.zip" | head -n 1)
+          if [ -z "$ZIP" ]; then
+            echo "ZIP dosyasi bulunamadi!"
+            exit 1
+          fi
+          unzip "$ZIP" -d extracted
+
+      - name: Find Gradle project
+        run: |
+          find extracted -type f \( -name build.gradle -o -name build.gradle.kts \)
 
       - name: Build
         run: |
-          PROJECT=$(find . -name build.gradle -o -name build.gradle.kts | head -n 1)
+          PROJECT=$(find extracted -type f \( -name build.gradle -o -name build.gradle.kts \) | head -n 1)
           if [ -z "$PROJECT" ]; then
-            echo "Gradle project not found!"
+            echo "Gradle projesi bulunamadi!"
             exit 1
           fi
-          cd "$(dirname "$PROJECT")"
-          gradle build
+          DIR=$(dirname "$PROJECT")
+          cd "$DIR"
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew build
+          else
+            gradle build
+          fi
 
       - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
           name: Fatih-Client-JAR
-          path: '**/build/libs/*.jar'
+          path: extracted/**/build/libs/*.jar
           if-no-files-found: error
